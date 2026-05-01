@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redact</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111;
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.8rem 1.2rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+
+  .toolbar .btn {
+    padding: 0.45rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .btn-primary { background: #4a9eff; color: #fff; }
+  .btn-primary:hover { background: #3a8eef; }
+
+  .btn-secondary { background: #333; color: #ccc; }
+  .btn-secondary:hover { background: #444; }
+
+  .btn-danger { background: #e94560; color: #fff; }
+  .btn-danger:hover { background: #d63851; }
+
+  .spacer { flex: 1; }
+
+  .hint {
+    color: #555;
+    font-size: 0.8rem;
+  }
+
+  .status {
+    color: #4caf50;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .status.show { opacity: 1; }
+
+  /* Canvas area */
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    color: #444;
+    font-size: 1rem;
+    height: 100%;
+    width: 100%;
+  }
+
+  .drop-zone .big {
+    font-size: 1.3rem;
+    color: #555;
+  }
+
+  canvas {
+    cursor: crosshair;
+    max-width: 100%;
+    max-height: 100%;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button class="btn btn-secondary" id="paste-btn">Paste Image</button>
+  <button class="btn btn-secondary" id="undo-btn" disabled>Undo</button>
+  <button class="btn btn-danger" id="clear-btn" style="display:none;">Clear</button>
+  <span class="spacer"></span>
+  <span class="hint" id="hint">Paste a screenshot (Cmd+V) or click Paste Image</span>
+  <span class="status" id="status">Copied!</span>
+  <button class="btn btn-primary" id="copy-btn" style="display:none;">Copy</button>
+</div>
+
+<div class="canvas-wrap" id="canvas-wrap">
+  <div class="drop-zone" id="drop-zone">
+    <div class="big">Paste a screenshot to get started</div>
+    <div>Cmd+V or drag and drop an image</div>
+  </div>
+  <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const dropZone = document.getElementById('drop-zone');
+  const undoBtn = document.getElementById('undo-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const copyBtn = document.getElementById('copy-btn');
+  const pasteBtn = document.getElementById('paste-btn');
+  const hint = document.getElementById('hint');
+  const status = document.getElementById('status');
+
+  let img = null;
+  let redactions = []; // [{x, y, w, h}]
+  let drawing = false;
+  let startX = 0, startY = 0;
+
+  // Scale factor: canvas pixel coords vs displayed size
+  function getScale() {
+    return img ? img.naturalWidth / canvas.offsetWidth : 1;
+  }
+
+  function loadImage(source) {
+    const i = new Image();
+    i.onload = () => {
+      img = i;
+      canvas.width = i.naturalWidth;
+      canvas.height = i.naturalHeight;
+      redactions = [];
+      render();
+      dropZone.style.display = 'none';
+      canvas.style.display = 'block';
+      copyBtn.style.display = '';
+      clearBtn.style.display = '';
+      undoBtn.disabled = true;
+      hint.textContent = 'Click and drag to redact areas';
+    };
+    if (typeof source === 'string') {
+      i.src = source;
+    } else {
+      i.src = URL.createObjectURL(source);
+    }
+  }
+
+  function render() {
+    if (!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    // Draw redaction boxes
+    redactions.forEach(r => {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    });
+  }
+
+  // Mouse events for drawing redaction rectangles
+  canvas.addEventListener('mousedown', (e) => {
+    if (!img) return;
+    drawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    startX = (e.clientX - rect.left) * scale;
+    startY = (e.clientY - rect.top) * scale;
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const curX = (e.clientX - rect.left) * scale;
+    const curY = (e.clientY - rect.top) * scale;
+    // Render base + existing redactions + preview
+    render();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(startX, startY, curX - startX, curY - startY);
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (!drawing) return;
+    drawing = false;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const endX = (e.clientX - rect.left) * scale;
+    const endY = (e.clientY - rect.top) * scale;
+
+    const w = endX - startX;
+    const h = endY - startY;
+
+    // Ignore tiny accidental clicks
+    if (Math.abs(w) > 5 && Math.abs(h) > 5) {
+      redactions.push({
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        w: Math.abs(w),
+        h: Math.abs(h),
+      });
+      undoBtn.disabled = false;
+    }
+    render();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (drawing) {
+      drawing = false;
+      render();
+    }
+  });
+
+  // Undo
+  undoBtn.addEventListener('click', () => {
+    redactions.pop();
+    undoBtn.disabled = redactions.length === 0;
+    render();
+  });
+
+  // Clear all
+  clearBtn.addEventListener('click', () => {
+    img = null;
+    redactions = [];
+    canvas.style.display = 'none';
+    dropZone.style.display = '';
+    copyBtn.style.display = 'none';
+    clearBtn.style.display = 'none';
+    undoBtn.disabled = true;
+    hint.textContent = 'Paste a screenshot (Cmd+V) or click Paste Image';
+  });
+
+  // Copy to clipboard
+  copyBtn.addEventListener('click', async () => {
+    render(); // make sure it's current
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      status.classList.add('show');
+      setTimeout(() => status.classList.remove('show'), 1500);
+    } catch (e) {
+      // Fallback: download
+      const link = document.createElement('a');
+      link.download = 'redacted.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      hint.textContent = 'Downloaded as redacted.png (clipboard not available in iframe)';
+    }
+  });
+
+  // Paste from clipboard
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        loadImage(item.getAsFile());
+        return;
+      }
+    }
+  });
+
+  pasteBtn.addEventListener('click', async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            loadImage(blob);
+            return;
+          }
+        }
+      }
+      hint.textContent = 'No image found in clipboard';
+    } catch (e) {
+      hint.textContent = 'Clipboard access denied - use Cmd+V instead';
+    }
+  });
+
+  // Drag and drop
+  canvasWrap.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  canvasWrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      loadImage(file);
+    }
+  });
+</script>
+</body>
+</html>

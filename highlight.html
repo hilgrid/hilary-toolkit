@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highlight</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111;
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.8rem 1.2rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+
+  .toolbar .btn {
+    padding: 0.45rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .btn-primary { background: #4a9eff; color: #fff; }
+  .btn-primary:hover { background: #3a8eef; }
+
+  .btn-secondary { background: #333; color: #ccc; }
+  .btn-secondary:hover { background: #444; }
+
+  .btn-danger { background: #e94560; color: #fff; }
+  .btn-danger:hover { background: #d63851; }
+
+  .save-wrap { position: relative; display: inline-block; }
+
+  .save-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: #1f1f1f;
+    border: 1px solid #333;
+    border-radius: 6px;
+    min-width: 200px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    padding: 4px;
+    display: none;
+    z-index: 10;
+  }
+
+  .save-menu.show { display: block; }
+
+  .save-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    color: #eee;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .save-menu button:hover { background: #2d2d2d; }
+
+  .save-menu .label {
+    padding: 0.4rem 0.75rem 0.2rem;
+    font-size: 0.7rem;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .color-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #555;
+    cursor: pointer;
+    transition: border-color 0.12s;
+  }
+
+  .color-btn.active { border-color: #fff; }
+  .color-btn:hover { border-color: #aaa; }
+
+  .spacer { flex: 1; }
+
+  .hint {
+    color: #555;
+    font-size: 0.8rem;
+  }
+
+  .status {
+    color: #4caf50;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .status.show { opacity: 1; }
+
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    color: #444;
+    font-size: 1rem;
+    height: 100%;
+    width: 100%;
+  }
+
+  .drop-zone .big {
+    font-size: 1.3rem;
+    color: #555;
+  }
+
+  canvas {
+    cursor: crosshair;
+    max-width: 100%;
+    max-height: 100%;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button class="btn btn-secondary" id="paste-btn">Paste Image</button>
+  <button class="btn btn-secondary" id="undo-btn" disabled>Undo</button>
+  <button class="btn btn-danger" id="clear-btn" style="display:none;">Clear</button>
+  <span style="color:#555; font-size:0.8rem; margin-left:0.4rem;">Color:</span>
+  <button class="color-btn active" data-color="rgba(180, 170, 50, 0.35)" style="background: rgba(180, 170, 50, 0.6);" title="Yellow"></button>
+  <button class="color-btn" data-color="rgba(74, 158, 255, 0.3)" style="background: rgba(74, 158, 255, 0.6);" title="Blue"></button>
+  <button class="color-btn" data-color="rgba(76, 175, 80, 0.3)" style="background: rgba(76, 175, 80, 0.6);" title="Green"></button>
+  <button class="color-btn" data-color="rgba(233, 69, 96, 0.3)" style="background: rgba(233, 69, 96, 0.6);" title="Red"></button>
+  <button class="color-btn" data-color="rgba(171, 71, 188, 0.3)" style="background: rgba(171, 71, 188, 0.6);" title="Purple"></button>
+  <span class="spacer"></span>
+  <span class="hint" id="hint">Paste a screenshot (Cmd+V) or click Paste Image</span>
+  <span class="status" id="status">Copied!</span>
+  <button class="btn btn-primary" id="copy-btn" style="display:none;">Copy</button>
+  <div class="save-wrap" id="save-wrap" style="display:none;">
+    <button class="btn btn-secondary" id="save-btn">Save to ▾</button>
+    <div class="save-menu" id="save-menu">
+      <div class="label">Save image to</div>
+      <div id="save-dest-list"></div>
+      <button data-dest="__choose">Other folder…</button>
+    </div>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="canvas-wrap">
+  <div class="drop-zone" id="drop-zone">
+    <div class="big">Paste a screenshot to highlight</div>
+    <div>Cmd+V or drag and drop an image</div>
+  </div>
+  <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const dropZone = document.getElementById('drop-zone');
+  const undoBtn = document.getElementById('undo-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const copyBtn = document.getElementById('copy-btn');
+  const pasteBtn = document.getElementById('paste-btn');
+  const hint = document.getElementById('hint');
+  const status = document.getElementById('status');
+  const saveWrap = document.getElementById('save-wrap');
+  const saveBtn = document.getElementById('save-btn');
+  const saveMenu = document.getElementById('save-menu');
+
+  let img = null;
+  let highlights = []; // [{x, y, w, h, color}]
+  let drawing = false;
+  let startX = 0, startY = 0;
+  let currentColor = 'rgba(180, 170, 50, 0.35)';
+
+  // Color picker
+  document.querySelectorAll('.color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentColor = btn.dataset.color;
+    });
+  });
+
+  function loadImage(source) {
+    const i = new Image();
+    i.onload = () => {
+      img = i;
+      canvas.width = i.naturalWidth;
+      canvas.height = i.naturalHeight;
+      highlights = [];
+      render();
+      dropZone.style.display = 'none';
+      canvas.style.display = 'block';
+      copyBtn.style.display = '';
+      clearBtn.style.display = '';
+      saveWrap.style.display = '';
+      undoBtn.disabled = true;
+      hint.textContent = 'Click and drag to highlight areas';
+    };
+    if (typeof source === 'string') {
+      i.src = source;
+    } else {
+      i.src = URL.createObjectURL(source);
+    }
+  }
+
+  function render() {
+    if (!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    highlights.forEach(h => {
+      ctx.fillStyle = h.color;
+      ctx.fillRect(h.x, h.y, h.w, h.h);
+    });
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (!img) return;
+    drawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    startX = (e.clientX - rect.left) * scale;
+    startY = (e.clientY - rect.top) * scale;
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const curX = (e.clientX - rect.left) * scale;
+    const curY = (e.clientY - rect.top) * scale;
+    render();
+    ctx.fillStyle = currentColor;
+    ctx.fillRect(startX, startY, curX - startX, curY - startY);
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (!drawing) return;
+    drawing = false;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const endX = (e.clientX - rect.left) * scale;
+    const endY = (e.clientY - rect.top) * scale;
+
+    const w = endX - startX;
+    const h = endY - startY;
+
+    if (Math.abs(w) > 3 && Math.abs(h) > 3) {
+      highlights.push({
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        w: Math.abs(w),
+        h: Math.abs(h),
+        color: currentColor,
+      });
+      undoBtn.disabled = false;
+    }
+    render();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (drawing) {
+      drawing = false;
+      render();
+    }
+  });
+
+  undoBtn.addEventListener('click', () => {
+    highlights.pop();
+    undoBtn.disabled = highlights.length === 0;
+    render();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    img = null;
+    highlights = [];
+    canvas.style.display = 'none';
+    dropZone.style.display = '';
+    copyBtn.style.display = 'none';
+    clearBtn.style.display = 'none';
+    saveWrap.style.display = 'none';
+    saveMenu.classList.remove('show');
+    undoBtn.disabled = true;
+    hint.textContent = 'Paste a screenshot (Cmd+V) or click Paste Image';
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    render();
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      status.classList.add('show');
+      setTimeout(() => status.classList.remove('show'), 1500);
+    } catch (e) {
+      const link = document.createElement('a');
+      link.download = 'highlighted.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      hint.textContent = 'Downloaded as highlighted.png (clipboard not available in iframe)';
+    }
+  });
+
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        loadImage(item.getAsFile());
+        return;
+      }
+    }
+  });
+
+  pasteBtn.addEventListener('click', async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            loadImage(blob);
+            return;
+          }
+        }
+      }
+      hint.textContent = 'No image found in clipboard';
+    } catch (e) {
+      hint.textContent = 'Clipboard access denied - use Cmd+V instead';
+    }
+  });
+
+  saveBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveMenu.classList.toggle('show');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!saveWrap.contains(e.target)) saveMenu.classList.remove('show');
+  });
+
+  // Populate save destinations from server config
+  (async () => {
+    try {
+      const res = await fetch('/api/destinations');
+      const data = await res.json();
+      const list = document.getElementById('save-dest-list');
+      (data.destinations || []).forEach(d => {
+        const b = document.createElement('button');
+        b.dataset.dest = d.key;
+        b.textContent = d.label;
+        list.appendChild(b);
+      });
+    } catch (err) { /* ignore — fall back to __choose only */ }
+  })();
+
+  saveMenu.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-dest]');
+    if (!btn) return;
+    const dest = btn.dataset.dest;
+    const label = btn.textContent;
+    saveMenu.classList.remove('show');
+
+    const filename = prompt(`Filename for ${label} (leave blank for timestamp):`, '');
+    if (filename === null) return;
+
+    render();
+    const dataUrl = canvas.toDataURL('image/png');
+    hint.textContent = dest === '__choose' ? 'Choose a folder…' : `Saving to ${label}…`;
+    try {
+      const res = await fetch('/api/save-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination: dest, dataUrl, filename }),
+      });
+      const data = await res.json();
+      if (data.cancelled) {
+        hint.textContent = 'Cancelled';
+      } else if (data.success) {
+        hint.textContent = `Saved → ${data.path}`;
+        status.textContent = 'Saved!';
+        status.classList.add('show');
+        setTimeout(() => status.classList.remove('show'), 1500);
+      } else {
+        hint.textContent = `Save failed: ${data.error || 'unknown error'}`;
+      }
+    } catch (err) {
+      hint.textContent = `Save failed: ${err.message}`;
+    }
+  });
+
+  canvasWrap.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  canvasWrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      loadImage(file);
+    }
+  });
+</script>
+</body>
+</html>

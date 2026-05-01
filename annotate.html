@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annotate</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111;
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.8rem 1.2rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+
+  .toolbar .btn {
+    padding: 0.45rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .btn-primary { background: #4a9eff; color: #fff; }
+  .btn-primary:hover { background: #3a8eef; }
+
+  .btn-secondary { background: #333; color: #ccc; }
+  .btn-secondary:hover { background: #444; }
+
+  .btn-danger { background: #e94560; color: #fff; }
+  .btn-danger:hover { background: #d63851; }
+
+  .btn-tool { background: #333; color: #ccc; border: 2px solid transparent; }
+  .btn-tool:hover { background: #444; }
+  .btn-tool.active { border-color: #e94560; color: #fff; background: #3a1a1f; }
+
+  .save-wrap { position: relative; display: inline-block; }
+
+  .save-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: #1f1f1f;
+    border: 1px solid #333;
+    border-radius: 6px;
+    min-width: 200px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    padding: 4px;
+    display: none;
+    z-index: 10;
+  }
+
+  .save-menu.show { display: block; }
+
+  .save-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    color: #eee;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .save-menu button:hover { background: #2d2d2d; }
+
+  .save-menu .label {
+    padding: 0.4rem 0.75rem 0.2rem;
+    font-size: 0.7rem;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .divider {
+    width: 1px;
+    height: 1.4rem;
+    background: #333;
+  }
+
+  .spacer { flex: 1; }
+
+  .hint {
+    color: #555;
+    font-size: 0.8rem;
+  }
+
+  .status {
+    color: #4caf50;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .status.show { opacity: 1; }
+
+  .canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    color: #444;
+    font-size: 1rem;
+    height: 100%;
+    width: 100%;
+  }
+
+  .drop-zone .big {
+    font-size: 1.3rem;
+    color: #555;
+  }
+
+  canvas {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  canvas.cursor-crosshair { cursor: crosshair; }
+  canvas.cursor-arrow { cursor: crosshair; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button class="btn btn-secondary" id="paste-btn">Paste Image</button>
+  <div class="divider"></div>
+  <button class="btn btn-tool active" id="mode-box" title="Draw red box">Box</button>
+  <button class="btn btn-tool" id="mode-arrow" title="Click to place arrow">Arrow</button>
+  <div class="divider"></div>
+  <button class="btn btn-secondary" id="undo-btn" disabled>Undo</button>
+  <button class="btn btn-danger" id="clear-btn" style="display:none;">Clear</button>
+  <span class="spacer"></span>
+  <span class="hint" id="hint">Paste a screenshot (Cmd+V) or click Paste Image</span>
+  <span class="status" id="status">Copied!</span>
+  <button class="btn btn-primary" id="copy-btn" style="display:none;">Copy</button>
+  <div class="save-wrap" id="save-wrap" style="display:none;">
+    <button class="btn btn-secondary" id="save-btn">Save to ▾</button>
+    <div class="save-menu" id="save-menu">
+      <div class="label">Save image to</div>
+      <div id="save-dest-list"></div>
+      <button data-dest="__choose">Other folder…</button>
+      <div class="label">Other</div>
+      <button data-dest="__download">Download via browser</button>
+    </div>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="canvas-wrap">
+  <div class="drop-zone" id="drop-zone">
+    <div class="big">Paste a screenshot to get started</div>
+    <div>Cmd+V or drag and drop an image</div>
+  </div>
+  <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const dropZone = document.getElementById('drop-zone');
+  const undoBtn = document.getElementById('undo-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const copyBtn = document.getElementById('copy-btn');
+  const saveWrap = document.getElementById('save-wrap');
+  const saveBtn = document.getElementById('save-btn');
+  const saveMenu = document.getElementById('save-menu');
+  const pasteBtn = document.getElementById('paste-btn');
+  const modeBoxBtn = document.getElementById('mode-box');
+  const modeArrowBtn = document.getElementById('mode-arrow');
+  const hint = document.getElementById('hint');
+  const status = document.getElementById('status');
+
+  let img = null;
+  let annotations = []; // [{type:'box', x, y, w, h} | {type:'arrow', x, y}]
+  let mode = 'box'; // 'box' or 'arrow'
+  let drawing = false;
+  let startX = 0, startY = 0;
+
+  const RED = '#e94560';
+  const LINE_WIDTH_FACTOR = 0.004; // relative to image width
+
+  // Mode switching
+  modeBoxBtn.addEventListener('click', () => {
+    mode = 'box';
+    modeBoxBtn.classList.add('active');
+    modeArrowBtn.classList.remove('active');
+    canvas.className = 'cursor-crosshair';
+    if (img) hint.textContent = 'Click and drag to draw a red box';
+  });
+
+  modeArrowBtn.addEventListener('click', () => {
+    mode = 'arrow';
+    modeArrowBtn.classList.add('active');
+    modeBoxBtn.classList.remove('active');
+    canvas.className = 'cursor-arrow';
+    if (img) hint.textContent = 'Click where you want the arrow to point';
+  });
+
+  function getLineWidth() {
+    if (!img) return 3;
+    return Math.max(3, Math.round(img.naturalWidth * LINE_WIDTH_FACTOR));
+  }
+
+  function loadImage(source) {
+    const i = new Image();
+    i.onload = () => {
+      img = i;
+      canvas.width = i.naturalWidth;
+      canvas.height = i.naturalHeight;
+      annotations = [];
+      render();
+      dropZone.style.display = 'none';
+      canvas.style.display = 'block';
+      canvas.className = mode === 'box' ? 'cursor-crosshair' : 'cursor-arrow';
+      copyBtn.style.display = '';
+      saveWrap.style.display = '';
+      clearBtn.style.display = '';
+      undoBtn.disabled = true;
+      hint.textContent = mode === 'box'
+        ? 'Click and drag to draw a red box'
+        : 'Click where you want the arrow to point';
+    };
+    if (typeof source === 'string') {
+      i.src = source;
+    } else {
+      i.src = URL.createObjectURL(source);
+    }
+  }
+
+  function drawArrow(cx, cy) {
+    const lw = getLineWidth();
+    const arrowLen = lw * 20;
+    const headLen = lw * 6;
+    const headWidth = lw * 4;
+
+    // Arrow comes from upper-left, pointing down-right to (cx, cy)
+    const angle = Math.PI / 4; // 45 degrees
+    const fromX = cx - arrowLen * Math.cos(angle);
+    const fromY = cy - arrowLen * Math.sin(angle);
+
+    // Shaft
+    ctx.strokeStyle = RED;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+
+    // Arrowhead
+    const tipAngle = Math.atan2(cy - fromY, cx - fromX);
+    ctx.fillStyle = RED;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(
+      cx - headLen * Math.cos(tipAngle - Math.PI / 6),
+      cy - headLen * Math.sin(tipAngle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      cx - headLen * Math.cos(tipAngle + Math.PI / 6),
+      cy - headLen * Math.sin(tipAngle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawBox(x, y, w, h) {
+    const lw = getLineWidth();
+    ctx.strokeStyle = RED;
+    ctx.lineWidth = lw;
+    ctx.lineJoin = 'miter';
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  function render() {
+    if (!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    annotations.forEach(a => {
+      if (a.type === 'box') {
+        drawBox(a.x, a.y, a.w, a.h);
+      } else if (a.type === 'arrow') {
+        drawArrow(a.x, a.y);
+      }
+    });
+  }
+
+  // Mouse events
+  canvas.addEventListener('mousedown', (e) => {
+    if (!img) return;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const cx = (e.clientX - rect.left) * scale;
+    const cy = (e.clientY - rect.top) * scale;
+
+    if (mode === 'box') {
+      drawing = true;
+      startX = cx;
+      startY = cy;
+    } else if (mode === 'arrow') {
+      annotations.push({ type: 'arrow', x: cx, y: cy });
+      undoBtn.disabled = false;
+      render();
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!drawing || mode !== 'box') return;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const curX = (e.clientX - rect.left) * scale;
+    const curY = (e.clientY - rect.top) * scale;
+    render();
+    // Preview
+    ctx.strokeStyle = 'rgba(233, 69, 96, 0.6)';
+    ctx.lineWidth = getLineWidth();
+    ctx.lineJoin = 'miter';
+    ctx.strokeRect(startX, startY, curX - startX, curY - startY);
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (!drawing || mode !== 'box') return;
+    drawing = false;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width / rect.width;
+    const endX = (e.clientX - rect.left) * scale;
+    const endY = (e.clientY - rect.top) * scale;
+
+    const w = endX - startX;
+    const h = endY - startY;
+
+    if (Math.abs(w) > 5 && Math.abs(h) > 5) {
+      annotations.push({
+        type: 'box',
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        w: Math.abs(w),
+        h: Math.abs(h),
+      });
+      undoBtn.disabled = false;
+    }
+    render();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (drawing) {
+      drawing = false;
+      render();
+    }
+  });
+
+  // Undo
+  undoBtn.addEventListener('click', () => {
+    annotations.pop();
+    undoBtn.disabled = annotations.length === 0;
+    render();
+  });
+
+  // Clear
+  clearBtn.addEventListener('click', () => {
+    img = null;
+    annotations = [];
+    canvas.style.display = 'none';
+    dropZone.style.display = '';
+    copyBtn.style.display = 'none';
+    saveWrap.style.display = 'none';
+    saveMenu.classList.remove('show');
+    clearBtn.style.display = 'none';
+    undoBtn.disabled = true;
+    hint.textContent = 'Paste a screenshot (Cmd+V) or click Paste Image';
+  });
+
+  function showStatus(msg) {
+    status.textContent = msg;
+    status.classList.add('show');
+    setTimeout(() => status.classList.remove('show'), 1500);
+  }
+
+  // Copy to clipboard
+  copyBtn.addEventListener('click', async () => {
+    render();
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      showStatus('Copied!');
+    } catch (e) {
+      // Fallback: download
+      downloadImage();
+      hint.textContent = 'Downloaded (clipboard not available in iframe)';
+    }
+  });
+
+  // Save to desktop
+  function downloadImage() {
+    const link = document.createElement('a');
+    link.download = 'annotated.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  saveBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveMenu.classList.toggle('show');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!saveWrap.contains(e.target)) saveMenu.classList.remove('show');
+  });
+
+  // Populate save destinations from server config
+  (async () => {
+    try {
+      const res = await fetch('/api/destinations');
+      const data = await res.json();
+      const list = document.getElementById('save-dest-list');
+      (data.destinations || []).forEach(d => {
+        const b = document.createElement('button');
+        b.dataset.dest = d.key;
+        b.textContent = d.label;
+        list.appendChild(b);
+      });
+    } catch (err) { /* ignore — fall back to __choose / __download only */ }
+  })();
+
+  saveMenu.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-dest]');
+    if (!btn) return;
+    const dest = btn.dataset.dest;
+    const label = btn.textContent;
+    saveMenu.classList.remove('show');
+    render();
+
+      if (dest === '__download') {
+        downloadImage();
+        showStatus('Saved!');
+        return;
+      }
+
+      const filename = prompt(`Filename for ${label} (leave blank for timestamp):`, '');
+      if (filename === null) return;
+
+      const dataUrl = canvas.toDataURL('image/png');
+      hint.textContent = dest === '__choose' ? 'Choose a folder…' : `Saving to ${label}…`;
+      try {
+        const res = await fetch('/api/save-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ destination: dest, dataUrl, filename }),
+        });
+        const data = await res.json();
+        if (data.cancelled) {
+          hint.textContent = 'Cancelled';
+        } else if (data.success) {
+          hint.textContent = `Saved → ${data.path}`;
+          showStatus('Saved!');
+        } else {
+          hint.textContent = `Save failed: ${data.error || 'unknown error'}`;
+        }
+      } catch (err) {
+        hint.textContent = `Save failed: ${err.message}`;
+      }
+  });
+
+  // Paste from clipboard
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        loadImage(item.getAsFile());
+        return;
+      }
+    }
+  });
+
+  pasteBtn.addEventListener('click', async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            loadImage(blob);
+            return;
+          }
+        }
+      }
+      hint.textContent = 'No image found in clipboard';
+    } catch (e) {
+      hint.textContent = 'Clipboard access denied - use Cmd+V instead';
+    }
+  });
+
+  // Drag and drop
+  canvasWrap.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  canvasWrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      loadImage(file);
+    }
+  });
+</script>
+</body>
+</html>

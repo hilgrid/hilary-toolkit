@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Code</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111;
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.8rem 1.2rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+
+  .toolbar input[type="text"] {
+    flex: 1;
+    background: #222;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.9rem;
+  }
+
+  .toolbar input[type="text"]:focus {
+    outline: none;
+    border-color: #4a9eff;
+  }
+
+  .toolbar label {
+    font-size: 0.85rem;
+    color: #999;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .toolbar select {
+    background: #222;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: #4a9eff;
+    color: #fff;
+    transition: background 0.12s;
+  }
+  .btn:hover { background: #3a8eef; }
+  .btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  .stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: #0a0a0a;
+  }
+
+  .qr-card {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #qr-canvas {
+    display: block;
+  }
+
+  .empty {
+    color: #444;
+    font-size: 1rem;
+  }
+
+  .footer {
+    padding: 0.6rem 1.2rem;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    font-size: 0.8rem;
+    color: #666;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <input type="text" id="qr-input" placeholder="Type or paste a URL or any text..." autocomplete="off" autofocus>
+  <label>
+    Size
+    <select id="qr-size">
+      <option value="200">200</option>
+      <option value="300" selected>300</option>
+      <option value="500">500</option>
+      <option value="800">800</option>
+    </select>
+  </label>
+  <button class="btn" id="qr-copy" disabled>Copy</button>
+  <button class="btn" id="qr-download" disabled>Download PNG</button>
+</div>
+
+<div class="stage">
+  <div class="qr-card" id="qr-card" style="display:none;">
+    <canvas id="qr-canvas"></canvas>
+  </div>
+  <div class="empty" id="empty">Type something above to generate a QR code</div>
+</div>
+
+<div class="footer">Generated locally — nothing leaves your machine</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+  const input = document.getElementById('qr-input');
+  const sizeSelect = document.getElementById('qr-size');
+  const canvas = document.getElementById('qr-canvas');
+  const card = document.getElementById('qr-card');
+  const empty = document.getElementById('empty');
+  const downloadBtn = document.getElementById('qr-download');
+  const copyBtn = document.getElementById('qr-copy');
+
+  let debounceTimer;
+
+  function render() {
+    const text = input.value.trim();
+    const size = parseInt(sizeSelect.value, 10);
+
+    if (!text) {
+      card.style.display = 'none';
+      empty.style.display = 'block';
+      empty.textContent = 'Type something above to generate a QR code';
+      downloadBtn.disabled = true;
+      copyBtn.disabled = true;
+      return;
+    }
+
+    try {
+      const qr = qrcode(0, 'M'); // type 0 = auto-detect
+      qr.addData(text);
+      qr.make();
+
+      const moduleCount = qr.getModuleCount();
+      const margin = 2; // modules
+      const totalModules = moduleCount + margin * 2;
+      const cellSize = Math.floor(size / totalModules);
+      const actualSize = cellSize * totalModules;
+
+      canvas.width = actualSize;
+      canvas.height = actualSize;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, actualSize, actualSize);
+      ctx.fillStyle = '#000000';
+      for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+          if (qr.isDark(r, c)) {
+            ctx.fillRect((c + margin) * cellSize, (r + margin) * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+
+      empty.style.display = 'none';
+      card.style.display = 'flex';
+      downloadBtn.disabled = false;
+      copyBtn.disabled = false;
+      copyBtn.textContent = 'Copy';
+    } catch (err) {
+      empty.style.display = 'block';
+      empty.textContent = 'Could not generate (text too long?)';
+      card.style.display = 'none';
+      downloadBtn.disabled = true;
+    }
+  }
+
+  function debouncedRender() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(render, 120);
+  }
+
+  input.addEventListener('input', debouncedRender);
+  sizeSelect.addEventListener('change', render);
+
+  downloadBtn.addEventListener('click', () => {
+    const link = document.createElement('a');
+    const text = input.value.trim();
+    const slug = text.replace(/[^A-Za-z0-9]/g, '-').slice(0, 40) || 'qrcode';
+    link.download = `${slug}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    } catch (err) {
+      copyBtn.textContent = 'Copy failed';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    }
+  });
+</script>
+</body>
+</html>

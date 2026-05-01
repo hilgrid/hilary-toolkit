@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teleprompter</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* --- Setup screen --- */
+  #setup {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 2rem;
+    gap: 1rem;
+  }
+
+  #setup h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #ccc;
+  }
+
+  #script-input {
+    flex: 1;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 1rem;
+    resize: none;
+    outline: none;
+  }
+
+  #script-input::placeholder { color: #555; }
+  #script-input:focus { border-color: #4a9eff; }
+
+  .setup-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .setup-controls label {
+    color: #999;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .setup-controls input[type="range"] {
+    width: 120px;
+    accent-color: #4a9eff;
+  }
+
+  .setup-controls input[type="number"] {
+    width: 60px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #fff;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
+  .btn {
+    padding: 0.6rem 1.4rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-primary {
+    background: #4a9eff;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #3a8eef; }
+
+  .btn-secondary {
+    background: #333;
+    color: #ccc;
+  }
+  .btn-secondary:hover { background: #444; }
+
+  .spacer { flex: 1; }
+
+  /* --- Prompter screen --- */
+  #prompter {
+    display: none;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #prompter.mirrored #scroll-container {
+    transform: scaleX(-1);
+  }
+
+  .guide-line {
+    position: absolute;
+    top: 30%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(74, 158, 255, 0.4);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .fade-top, .fade-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 15%;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .fade-top {
+    top: 0;
+    background: linear-gradient(to bottom, #111, transparent);
+  }
+
+  .fade-bottom {
+    bottom: 0;
+    background: linear-gradient(to top, #111, transparent);
+  }
+
+  #scroll-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 30vh 10vw 70vh 10vw;
+    will-change: transform;
+  }
+
+  #scroll-container p {
+    margin-bottom: 1em;
+    line-height: 1.5;
+  }
+
+  /* --- Floating controls --- */
+  #float-controls {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: rgba(30, 30, 30, 0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 0.5rem 1rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  #prompter:hover #float-controls,
+  #float-controls:hover,
+  #float-controls.visible {
+    opacity: 1;
+  }
+
+  #float-controls .btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+
+  #speed-display {
+    color: #999;
+    font-size: 0.8rem;
+    min-width: 3rem;
+    text-align: center;
+  }
+
+  .kbd-hint {
+    color: #555;
+    font-size: 0.7rem;
+    text-align: center;
+    padding: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- Setup screen -->
+<div id="setup">
+  <h1>Teleprompter</h1>
+  <textarea id="script-input" placeholder="Paste your script here..."></textarea>
+  <div class="setup-controls">
+    <label>
+      Speed
+      <input type="range" id="speed-input" min="1" max="10" value="4" step="0.5">
+      <span id="speed-label">4</span>
+    </label>
+    <label>
+      Font size
+      <input type="number" id="font-size-input" min="16" max="120" value="42">px
+    </label>
+    <label>
+      <input type="checkbox" id="mirror-input"> Mirror
+    </label>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" id="start-btn">Start</button>
+  </div>
+  <div class="kbd-hint">Space = play/pause &middot; Up/Down = speed &middot; Esc = back to edit</div>
+</div>
+
+<!-- Prompter screen -->
+<div id="prompter">
+  <div class="fade-top"></div>
+  <div class="guide-line"></div>
+  <div id="scroll-container"></div>
+  <div class="fade-bottom"></div>
+  <div id="float-controls" class="visible">
+    <button class="btn btn-secondary" id="back-btn">Edit</button>
+    <button class="btn btn-primary" id="play-btn">Play</button>
+    <button class="btn btn-secondary" id="reset-btn">Reset</button>
+    <span id="speed-display">4x</span>
+    <button class="btn btn-secondary" id="fs-btn">Fullscreen</button>
+  </div>
+</div>
+
+<script>
+  const setupEl = document.getElementById('setup');
+  const prompterEl = document.getElementById('prompter');
+  const scriptInput = document.getElementById('script-input');
+  const speedInput = document.getElementById('speed-input');
+  const speedLabel = document.getElementById('speed-label');
+  const fontSizeInput = document.getElementById('font-size-input');
+  const mirrorInput = document.getElementById('mirror-input');
+  const startBtn = document.getElementById('start-btn');
+  const scrollContainer = document.getElementById('scroll-container');
+  const playBtn = document.getElementById('play-btn');
+  const backBtn = document.getElementById('back-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  const fsBtn = document.getElementById('fs-btn');
+  const speedDisplay = document.getElementById('speed-display');
+  const floatControls = document.getElementById('float-controls');
+
+  let speed = 4;
+  let scrollPos = 0;
+  let playing = false;
+  let animFrame = null;
+  let lastTime = null;
+  let hideTimer = null;
+
+  speedInput.addEventListener('input', () => {
+    speed = parseFloat(speedInput.value);
+    speedLabel.textContent = speed;
+    speedDisplay.textContent = speed + 'x';
+  });
+
+  startBtn.addEventListener('click', enterPrompter);
+  scriptInput.addEventListener('keydown', (e) => {
+    if (e.metaKey && e.key === 'Enter') enterPrompter();
+  });
+
+  function enterPrompter() {
+    const text = scriptInput.value.trim();
+    if (!text) return;
+
+    const fontSize = parseInt(fontSizeInput.value) || 42;
+    scrollContainer.style.fontSize = fontSize + 'px';
+
+    // Convert text to paragraphs
+    const paragraphs = text.split(/\n\s*\n/);
+    scrollContainer.innerHTML = paragraphs
+      .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+      .join('');
+
+    if (mirrorInput.checked) {
+      prompterEl.classList.add('mirrored');
+    } else {
+      prompterEl.classList.remove('mirrored');
+    }
+
+    scrollPos = 0;
+    scrollContainer.style.transform = `translateY(0px)`;
+    playing = false;
+    playBtn.textContent = 'Play';
+
+    setupEl.style.display = 'none';
+    prompterEl.style.display = 'block';
+
+    // Auto-hide controls after 3s
+    scheduleHide();
+  }
+
+  function scheduleHide() {
+    clearTimeout(hideTimer);
+    floatControls.classList.add('visible');
+    hideTimer = setTimeout(() => {
+      if (playing) floatControls.classList.remove('visible');
+    }, 3000);
+  }
+
+  prompterEl.addEventListener('mousemove', scheduleHide);
+
+  function togglePlay() {
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    if (playing) {
+      lastTime = performance.now();
+      animFrame = requestAnimationFrame(scroll);
+      scheduleHide();
+    } else {
+      cancelAnimationFrame(animFrame);
+      floatControls.classList.add('visible');
+    }
+  }
+
+  function scroll(now) {
+    if (!playing) return;
+    const dt = now - lastTime;
+    lastTime = now;
+    // pixels per second based on speed setting
+    const pxPerSec = speed * 30;
+    scrollPos += (pxPerSec * dt) / 1000;
+
+    const maxScroll = scrollContainer.scrollHeight - window.innerHeight;
+    if (scrollPos >= maxScroll) {
+      scrollPos = maxScroll;
+      playing = false;
+      playBtn.textContent = 'Play';
+      floatControls.classList.add('visible');
+    }
+
+    scrollContainer.style.transform = `translateY(${-scrollPos}px)`;
+    if (playing) animFrame = requestAnimationFrame(scroll);
+  }
+
+  playBtn.addEventListener('click', togglePlay);
+
+  resetBtn.addEventListener('click', () => {
+    scrollPos = 0;
+    scrollContainer.style.transform = `translateY(0px)`;
+    playing = false;
+    playBtn.textContent = 'Play';
+    cancelAnimationFrame(animFrame);
+  });
+
+  backBtn.addEventListener('click', () => {
+    playing = false;
+    cancelAnimationFrame(animFrame);
+    prompterEl.style.display = 'none';
+    setupEl.style.display = 'flex';
+    if (document.fullscreenElement) document.exitFullscreen();
+  });
+
+  fsBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    if (prompterEl.style.display !== 'block') return;
+    if (e.target.tagName === 'TEXTAREA') return;
+
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault();
+        togglePlay();
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        speed = Math.min(10, speed + 0.5);
+        speedInput.value = speed;
+        speedLabel.textContent = speed;
+        speedDisplay.textContent = speed + 'x';
+        scheduleHide();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        speed = Math.max(1, speed - 0.5);
+        speedInput.value = speed;
+        speedLabel.textContent = speed;
+        speedDisplay.textContent = speed + 'x';
+        scheduleHide();
+        break;
+      case 'Escape':
+        backBtn.click();
+        break;
+      case 'KeyF':
+        fsBtn.click();
+        break;
+      case 'KeyR':
+        resetBtn.click();
+        break;
+    }
+  });
+
+  // Manual scroll with mouse wheel
+  prompterEl.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    scrollPos += e.deltaY;
+    scrollPos = Math.max(0, scrollPos);
+    scrollContainer.style.transform = `translateY(${-scrollPos}px)`;
+  }, { passive: false });
+
+  // Pre-load script from URL param ?script=encoded_text
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('script')) {
+    scriptInput.value = decodeURIComponent(params.get('script'));
+    enterPrompter();
+  }
+</script>
+</body>
+</html>

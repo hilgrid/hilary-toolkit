@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pizza</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    user-select: none;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    background: #16213e;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+    border-right: 1px solid #0f3460;
+  }
+
+  .sidebar h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #e94560;
+  }
+
+  .section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #777;
+    margin-top: 0.5rem;
+  }
+
+  .topping-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    background: #1a1a2e;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    color: #ccc;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .topping-btn:hover { border-color: #e94560; color: #fff; }
+  .topping-btn.active { border-color: #e94560; background: #e9456022; color: #e94560; }
+
+  .topping-btn .emoji { font-size: 1.2rem; }
+
+  .btn-row { display: flex; gap: 0.5rem; margin-top: auto; }
+
+  .btn {
+    flex: 1;
+    padding: 0.6rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-bake {
+    background: #e94560;
+    color: #fff;
+  }
+  .btn-bake:hover { background: #d63851; }
+
+  .btn-clear {
+    background: #333;
+    color: #aaa;
+  }
+  .btn-clear:hover { background: #444; }
+
+  /* Canvas area */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  canvas {
+    border-radius: 50%;
+  }
+
+  /* Baking overlay */
+  #bake-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+  }
+
+  #bake-overlay.show { display: flex; }
+
+  #bake-overlay .temp {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #e94560;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #bake-overlay .status {
+    font-size: 1.1rem;
+    color: #999;
+  }
+
+  .progress-bar {
+    width: 300px;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #e94560, #ff6b6b);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+  }
+
+  #done-msg {
+    display: none;
+    text-align: center;
+  }
+
+  #done-msg h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  #done-msg p {
+    color: #999;
+    margin-bottom: 1rem;
+  }
+
+  #done-msg .btn {
+    width: auto;
+    padding: 0.6rem 2rem;
+    display: inline-block;
+  }
+
+  .hint {
+    color: #555;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h1>Build Your Pizza</h1>
+
+  <div class="section-label">Sauce</div>
+  <button class="topping-btn active" data-topping="marinara" data-group="sauce"><span class="emoji">🔴</span> Marinara</button>
+  <button class="topping-btn" data-topping="white" data-group="sauce"><span class="emoji">⚪</span> White / Garlic</button>
+  <button class="topping-btn" data-topping="pesto" data-group="sauce"><span class="emoji">🟢</span> Pesto</button>
+
+  <div class="section-label">Cheese</div>
+  <button class="topping-btn active" data-topping="mozzarella" data-group="cheese"><span class="emoji">🧀</span> Mozzarella</button>
+  <button class="topping-btn" data-topping="ricotta" data-group="cheese"><span class="emoji">🥛</span> Ricotta Dollops</button>
+
+  <div class="section-label">Toppings</div>
+  <button class="topping-btn" data-topping="pepperoni" data-group="top"><span class="emoji">🔴</span> Pepperoni</button>
+  <button class="topping-btn" data-topping="mushroom" data-group="top"><span class="emoji">🍄</span> Mushrooms</button>
+  <button class="topping-btn" data-topping="olive" data-group="top"><span class="emoji">🫒</span> Olives</button>
+  <button class="topping-btn" data-topping="basil" data-group="top"><span class="emoji">🌿</span> Fresh Basil</button>
+  <button class="topping-btn" data-topping="onion" data-group="top"><span class="emoji">🧅</span> Red Onion</button>
+  <button class="topping-btn" data-topping="pepper" data-group="top"><span class="emoji">🫑</span> Bell Pepper</button>
+  <button class="topping-btn" data-topping="sausage" data-group="top"><span class="emoji">🥩</span> Italian Sausage</button>
+  <button class="topping-btn" data-topping="arugula" data-group="top"><span class="emoji">🥬</span> Arugula</button>
+  <button class="topping-btn" data-topping="hotpepper" data-group="top"><span class="emoji">🌶️</span> Hot Peppers</button>
+  <button class="topping-btn" data-topping="prosciutto" data-group="top"><span class="emoji">🥓</span> Prosciutto</button>
+
+  <div class="section-label">Finish</div>
+  <button class="topping-btn" data-topping="redflakes" data-group="finish"><span class="emoji">🔥</span> Red Pepper Flakes</button>
+  <button class="topping-btn" data-topping="honey" data-group="finish"><span class="emoji">🍯</span> Hot Honey Drizzle</button>
+  <button class="topping-btn" data-topping="balsamic" data-group="finish"><span class="emoji">🫗</span> Balsamic Glaze</button>
+
+  <div class="btn-row">
+    <button class="btn btn-clear" id="clear-btn">Start Over</button>
+    <button class="btn btn-bake" id="bake-btn">Bake It</button>
+  </div>
+  <div class="hint">Click toppings to toggle them on/off</div>
+</div>
+
+<div class="canvas-area">
+  <canvas id="pizza" width="520" height="520"></canvas>
+</div>
+
+<div id="bake-overlay">
+  <div id="baking-progress">
+    <div class="temp" id="temp-display">72 F</div>
+    <div class="status" id="bake-status">Preheating oven...</div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+  <div id="done-msg">
+    <h2>Your pizza is ready!</h2>
+    <p>Perfectly baked at 500 F. Let it cool for a sec.</p>
+    <button class="btn btn-bake" onclick="closeBake()">Eat It</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('pizza');
+const ctx = canvas.getContext('2d');
+const SIZE = 520;
+const CENTER = SIZE / 2;
+const RADIUS = 230;
+
+let sauce = 'marinara';
+let cheese = 'mozzarella';
+let toppings = new Set();
+let finishes = new Set();
+
+// Topping buttons
+document.querySelectorAll('.topping-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = btn.dataset.topping;
+    const g = btn.dataset.group;
+
+    if (g === 'sauce') {
+      sauce = t;
+      document.querySelectorAll('[data-group="sauce"]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    } else if (g === 'cheese') {
+      btn.classList.toggle('active');
+      if (btn.classList.contains('active')) {
+        cheese = t;
+      } else if (cheese === t) {
+        cheese = null;
+      }
+    } else if (g === 'top') {
+      btn.classList.toggle('active');
+      if (btn.classList.contains('active')) toppings.add(t);
+      else toppings.delete(t);
+    } else if (g === 'finish') {
+      btn.classList.toggle('active');
+      if (btn.classList.contains('active')) finishes.add(t);
+      else finishes.delete(t);
+    }
+    drawPizza();
+  });
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  sauce = 'marinara';
+  cheese = 'mozzarella';
+  toppings.clear();
+  finishes.clear();
+  document.querySelectorAll('.topping-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-topping="marinara"]').classList.add('active');
+  document.querySelector('[data-topping="mozzarella"]').classList.add('active');
+  drawPizza();
+});
+
+// Seeded random for consistent placement
+function seededRandom(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 16807 + 0) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
+function isInCircle(x, y, r) {
+  const dx = x - CENTER;
+  const dy = y - CENTER;
+  return Math.sqrt(dx * dx + dy * dy) < r;
+}
+
+function scatterPoints(count, margin, seed) {
+  const rng = seededRandom(seed);
+  const pts = [];
+  for (let i = 0; i < count * 3 && pts.length < count; i++) {
+    const x = margin + rng() * (SIZE - margin * 2);
+    const y = margin + rng() * (SIZE - margin * 2);
+    if (isInCircle(x, y, RADIUS - margin)) {
+      pts.push({ x, y, r: rng() });
+    }
+  }
+  return pts;
+}
+
+function drawPizza() {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  // Shadow
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CENTER + 4, CENTER + 4, RADIUS + 8, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+  ctx.restore();
+
+  // Crust ring
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, RADIUS + 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#c8943e';
+  ctx.fill();
+
+  // Crust detail
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, RADIUS + 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#d4a24a';
+  ctx.fill();
+
+  // Inner dough
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, RADIUS - 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8c672';
+  ctx.fill();
+
+  // Sauce
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, RADIUS - 18, 0, Math.PI * 2);
+  ctx.clip();
+
+  if (sauce === 'marinara') {
+    ctx.fillStyle = '#b22222';
+    ctx.fill();
+    // Sauce texture
+    const saucePts = scatterPoints(40, 30, 42);
+    saucePts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6 + p.r * 8, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(160, 25, 25, ${0.3 + p.r * 0.3})`;
+      ctx.fill();
+    });
+  } else if (sauce === 'white') {
+    ctx.fillStyle = '#f5f0e0';
+    ctx.fill();
+    const saucePts = scatterPoints(30, 30, 43);
+    saucePts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5 + p.r * 6, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(220, 210, 180, ${0.4 + p.r * 0.3})`;
+      ctx.fill();
+    });
+  } else if (sauce === 'pesto') {
+    ctx.fillStyle = '#4a7c3f';
+    ctx.fill();
+    const saucePts = scatterPoints(35, 30, 44);
+    saucePts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4 + p.r * 7, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(60, 100, 45, ${0.3 + p.r * 0.4})`;
+      ctx.fill();
+    });
+  }
+
+  // Cheese
+  if (cheese === 'mozzarella') {
+    const cheesePts = scatterPoints(55, 25, 100);
+    cheesePts.forEach(p => {
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, 12 + p.r * 18, 8 + p.r * 12, p.r * Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 248, 220, ${0.45 + p.r * 0.25})`;
+      ctx.fill();
+    });
+  }
+
+  if (cheese === 'ricotta') {
+    const ricPts = scatterPoints(8, 40, 101);
+    ricPts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 14 + p.r * 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 253, 245, 0.85)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p.x - 2, p.y - 2, 8 + p.r * 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fill();
+    });
+  }
+
+  // Toppings
+  if (toppings.has('pepperoni')) {
+    const pts = scatterPoints(14, 35, 200);
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 13, 0, Math.PI * 2);
+      ctx.fillStyle = '#8b1a1a';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+      ctx.fillStyle = '#c0392b';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p.x - 2, p.y - 2, 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(200, 80, 60, 0.5)';
+      ctx.fill();
+    });
+  }
+
+  if (toppings.has('mushroom')) {
+    const pts = scatterPoints(10, 35, 201);
+    pts.forEach(p => {
+      // stem
+      ctx.fillStyle = '#f0e6d0';
+      ctx.fillRect(p.x - 3, p.y, 6, 10);
+      // cap
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 2, 11, 8, 0, Math.PI, 0);
+      ctx.fillStyle = '#c4a87a';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 2, 9, 6, 0, Math.PI, 0);
+      ctx.fillStyle = '#d4b88a';
+      ctx.fill();
+    });
+  }
+
+  if (toppings.has('olive')) {
+    const pts = scatterPoints(12, 35, 202);
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = '#2d2d2d';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#3d3d3d';
+      ctx.fill();
+    });
+  }
+
+  if (toppings.has('basil')) {
+    const pts = scatterPoints(7, 40, 203);
+    pts.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI * 2);
+      // Leaf shape
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.bezierCurveTo(10, -8, 12, 4, 0, 14);
+      ctx.bezierCurveTo(-12, 4, -10, -8, 0, -12);
+      ctx.fillStyle = '#2e8b2e';
+      ctx.fill();
+      // Vein
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(0, 12);
+      ctx.strokeStyle = 'rgba(20, 60, 20, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  if (toppings.has('onion')) {
+    const pts = scatterPoints(15, 35, 204);
+    pts.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI);
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI, true);
+      ctx.strokeStyle = 'rgba(180, 50, 120, 0.7)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, Math.PI, true);
+      ctx.strokeStyle = 'rgba(200, 80, 150, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  if (toppings.has('pepper')) {
+    const pts = scatterPoints(12, 35, 205);
+    const colors = ['#e74c3c', '#f39c12', '#27ae60'];
+    pts.forEach((p, i) => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI * 2);
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, Math.PI, true);
+      ctx.closeTo;
+      ctx.fillStyle = colors[i % 3];
+      ctx.fill();
+      ctx.fillRect(-9, -2, 18, 3);
+      ctx.restore();
+    });
+  }
+
+  if (toppings.has('sausage')) {
+    const pts = scatterPoints(12, 35, 206);
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#8B6914';
+      ctx.fill();
+      // crumbled texture
+      const rng = seededRandom(p.x * p.y);
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(p.x - 5 + rng() * 10, p.y - 5 + rng() * 10, 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(100, 60, 10, 0.5)';
+        ctx.fill();
+      }
+    });
+  }
+
+  if (toppings.has('arugula')) {
+    const pts = scatterPoints(10, 35, 207);
+    pts.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI * 2);
+      for (let l = 0; l < 3; l++) {
+        ctx.save();
+        ctx.rotate((l * Math.PI * 2) / 3);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(5, -6, 3, -16, 0, -20);
+        ctx.bezierCurveTo(-3, -16, -5, -6, 0, 0);
+        ctx.fillStyle = `rgba(50, 140, 50, ${0.6 + p.r * 0.3})`;
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    });
+  }
+
+  if (toppings.has('hotpepper')) {
+    const pts = scatterPoints(10, 35, 208);
+    pts.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI * 2);
+      // Ring shape
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#d4e840';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fillStyle = sauce === 'marinara' ? '#b22222' : sauce === 'pesto' ? '#4a7c3f' : '#f5f0e0';
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  if (toppings.has('prosciutto')) {
+    const pts = scatterPoints(6, 40, 209);
+    pts.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI);
+      // Wavy prosciutto
+      ctx.beginPath();
+      ctx.moveTo(-18, -5);
+      ctx.bezierCurveTo(-10, -12, 0, 5, 10, -8);
+      ctx.bezierCurveTo(18, -5, 18, 8, 10, 10);
+      ctx.bezierCurveTo(0, 15, -10, 2, -18, 8);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(190, 80, 80, 0.8)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-14, 0);
+      ctx.bezierCurveTo(-6, -5, 4, 5, 14, 0);
+      ctx.strokeStyle = 'rgba(220, 120, 120, 0.4)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  // Finishes
+  if (finishes.has('redflakes')) {
+    const pts = scatterPoints(40, 20, 300);
+    pts.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r * Math.PI * 2);
+      ctx.fillStyle = `rgba(200, 30, 15, ${0.6 + p.r * 0.4})`;
+      ctx.fillRect(-1.5, -1, 3, 2);
+      ctx.restore();
+    });
+  }
+
+  if (finishes.has('honey')) {
+    const rng = seededRandom(301);
+    ctx.strokeStyle = 'rgba(218, 165, 32, 0.5)';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      const startX = 120 + rng() * 280;
+      const startY = 120 + rng() * 280;
+      ctx.moveTo(startX, startY);
+      ctx.bezierCurveTo(
+        startX + 40 * (rng() - 0.5), startY + 40 * rng(),
+        startX + 80 * (rng() - 0.5), startY + 60 * rng(),
+        startX + 60 * (rng() - 0.5), startY + 80 * rng()
+      );
+      if (isInCircle(startX, startY, RADIUS - 20)) {
+        ctx.stroke();
+      }
+    }
+  }
+
+  if (finishes.has('balsamic')) {
+    const rng = seededRandom(302);
+    ctx.strokeStyle = 'rgba(60, 20, 10, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      const startX = 130 + rng() * 260;
+      const startY = 130 + rng() * 260;
+      ctx.moveTo(startX, startY);
+      ctx.bezierCurveTo(
+        startX + 50 * (rng() - 0.5), startY + 30 * rng(),
+        startX + 70 * (rng() - 0.5), startY + 50 * rng(),
+        startX + 50 * (rng() - 0.5), startY + 70 * rng()
+      );
+      if (isInCircle(startX, startY, RADIUS - 20)) {
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.restore();
+
+  // Char marks on crust
+  const rng = seededRandom(999);
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 + rng() * 0.3;
+    const r = RADIUS + rng() * 3;
+    const x = CENTER + Math.cos(angle) * r;
+    const y = CENTER + Math.sin(angle) * r;
+    ctx.beginPath();
+    ctx.arc(x, y, 3 + rng() * 4, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(150, 100, 30, ${0.2 + rng() * 0.3})`;
+    ctx.fill();
+  }
+}
+
+// Bake animation
+document.getElementById('bake-btn').addEventListener('click', () => {
+  const overlay = document.getElementById('bake-overlay');
+  const tempDisplay = document.getElementById('temp-display');
+  const statusEl = document.getElementById('bake-status');
+  const progressFill = document.getElementById('progress-fill');
+  const bakingProgress = document.getElementById('baking-progress');
+  const doneMsg = document.getElementById('done-msg');
+
+  overlay.classList.add('show');
+  bakingProgress.style.display = 'block';
+  doneMsg.style.display = 'none';
+
+  let temp = 72;
+  const targetTemp = 500;
+  const stages = [
+    { at: 0, msg: 'Preheating oven...' },
+    { at: 25, msg: 'Getting nice and hot...' },
+    { at: 50, msg: 'Sliding pizza in...' },
+    { at: 65, msg: 'Cheese is melting...' },
+    { at: 80, msg: 'Crust is browning...' },
+    { at: 92, msg: 'Almost there...' },
+  ];
+
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += 1;
+    if (progress > 100) {
+      clearInterval(interval);
+      bakingProgress.style.display = 'none';
+      doneMsg.style.display = 'block';
+      return;
+    }
+
+    temp = 72 + ((targetTemp - 72) * progress) / 100;
+    tempDisplay.textContent = Math.round(temp) + ' F';
+    progressFill.style.width = progress + '%';
+
+    for (let i = stages.length - 1; i >= 0; i--) {
+      if (progress >= stages[i].at) {
+        statusEl.textContent = stages[i].msg;
+        break;
+      }
+    }
+  }, 50);
+});
+
+function closeBake() {
+  document.getElementById('bake-overlay').classList.remove('show');
+}
+
+// Initial draw
+drawPizza();
+</script>
+</body>
+</html>

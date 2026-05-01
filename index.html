@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tools</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111;
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: #1a1a1a;
+    border-right: 1px solid #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 0;
+  }
+
+  .sidebar h1 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 1.2rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 1.2rem;
+    background: none;
+    border: none;
+    color: #999;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: all 0.12s;
+  }
+
+  .tool-btn:hover {
+    background: #222;
+    color: #fff;
+  }
+
+  .tool-btn.active {
+    background: #222;
+    color: #fff;
+    border-left: 2px solid #4a9eff;
+    padding-left: calc(1.2rem - 2px);
+  }
+
+  .tool-btn .icon {
+    font-size: 1.1rem;
+    width: 1.4rem;
+    text-align: center;
+  }
+
+  /* Main content */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .main iframe {
+    flex: 1;
+    border: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Welcome / empty state */
+  .welcome {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 1.1rem;
+  }
+
+  /* YouTube downloader panel */
+  .yt-panel {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    padding: 2rem;
+  }
+
+  .yt-panel.active { display: flex; }
+
+  .yt-panel h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #ccc;
+  }
+
+  .yt-input-row {
+    display: flex;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .yt-input {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+  }
+
+  .yt-input:focus { border-color: #4a9eff; }
+  .yt-input::placeholder { color: #555; }
+
+  .yt-btn {
+    padding: 0.7rem 1.4rem;
+    background: #4a9eff;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .yt-btn:hover { background: #3a8eef; }
+  .yt-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  .yt-status {
+    font-size: 0.85rem;
+    color: #666;
+    min-height: 1.2em;
+    text-align: center;
+    max-width: 560px;
+    word-break: break-all;
+  }
+
+  .yt-status.success { color: #4caf50; }
+  .yt-status.error { color: #e94560; }
+
+  .yt-hint {
+    font-size: 0.8rem;
+    color: #444;
+  }
+
+  /* Transcript panel */
+  .tx-panel {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    padding: 2rem;
+    gap: 1rem;
+    overflow: hidden;
+  }
+  .tx-panel.active { display: flex; }
+  .tx-panel h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #ccc;
+  }
+  .tx-input-row {
+    display: flex;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 720px;
+  }
+  .tx-output {
+    flex: 1;
+    width: 100%;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #ddd;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    padding: 1rem;
+    resize: none;
+    outline: none;
+    white-space: pre-wrap;
+  }
+  .tx-actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+  }
+  .tx-status {
+    font-size: 0.85rem;
+    color: #666;
+    min-height: 1.2em;
+  }
+  .tx-status.success { color: #4caf50; }
+  .tx-status.error { color: #e94560; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h1>Tools</h1>
+  <button class="tool-btn" data-tool="teleprompter">
+    <span class="icon">T</span> Teleprompter
+  </button>
+  <button class="tool-btn" data-tool="youtube">
+    <span class="icon">D</span> Download Video
+  </button>
+  <button class="tool-btn" data-tool="transcript">
+    <span class="icon">Y</span> YouTube Transcript
+  </button>
+  <button class="tool-btn" data-tool="redact">
+    <span class="icon">R</span> Redact Screenshot
+  </button>
+  <button class="tool-btn" data-tool="highlight">
+    <span class="icon">H</span> Highlight Screenshot
+  </button>
+  <button class="tool-btn" data-tool="annotate">
+    <span class="icon">A</span> Annotate Screenshot
+  </button>
+  <button class="tool-btn" data-tool="qrcode">
+    <span class="icon">Q</span> QR Code
+  </button>
+  <button class="tool-btn" data-tool="pizza">
+    <span class="icon">P</span> Pizza Builder
+  </button>
+</div>
+
+<div class="main" id="main">
+  <div class="welcome" id="welcome">Pick a tool from the sidebar</div>
+
+  <!-- YouTube downloader (inline) -->
+  <div class="yt-panel" id="yt-panel">
+    <h2>Download Video</h2>
+    <div class="yt-input-row">
+      <input class="yt-input" id="yt-url" type="text" placeholder="Paste YouTube URL..." autocomplete="off">
+      <button class="yt-btn" id="yt-go">Download</button>
+    </div>
+    <div class="yt-status" id="yt-status"></div>
+    <div class="yt-hint">Downloads to ~/Downloads as MP4</div>
+  </div>
+
+  <!-- Transcript panel (inline) -->
+  <div class="tx-panel" id="tx-panel">
+    <h2>YouTube Transcript</h2>
+    <div class="tx-input-row">
+      <input class="yt-input" id="tx-url" type="text" placeholder="Paste YouTube URL..." autocomplete="off">
+      <button class="yt-btn" id="tx-go">Fetch</button>
+    </div>
+    <div class="tx-actions">
+      <button class="yt-btn" id="tx-copy" disabled>Copy Markdown</button>
+      <button class="yt-btn" id="tx-download" disabled>Download .md</button>
+      <span class="tx-status" id="tx-status"></span>
+    </div>
+    <textarea class="tx-output" id="tx-output" placeholder="Transcript will appear here as markdown..." spellcheck="false"></textarea>
+  </div>
+
+  <!-- iframe for HTML tools -->
+  <iframe id="tool-frame" style="display:none;"></iframe>
+</div>
+
+<script>
+  const main = document.getElementById('main');
+  const welcome = document.getElementById('welcome');
+  const ytPanel = document.getElementById('yt-panel');
+  const txPanel = document.getElementById('tx-panel');
+  const toolFrame = document.getElementById('tool-frame');
+  const buttons = document.querySelectorAll('.tool-btn');
+
+  function showTool(tool) {
+    // Reset
+    welcome.style.display = 'none';
+    ytPanel.classList.remove('active');
+    txPanel.classList.remove('active');
+    toolFrame.style.display = 'none';
+
+    // Highlight sidebar
+    buttons.forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+
+    if (tool === 'youtube') {
+      ytPanel.classList.add('active');
+      document.getElementById('yt-url').focus();
+    } else if (tool === 'transcript') {
+      txPanel.classList.add('active');
+      document.getElementById('tx-url').focus();
+    } else if (tool === 'teleprompter') {
+      toolFrame.src = '/teleprompter.html';
+      toolFrame.style.display = 'block';
+    } else if (tool === 'redact') {
+      toolFrame.src = '/redact.html';
+      toolFrame.style.display = 'block';
+    } else if (tool === 'highlight') {
+      toolFrame.src = '/highlight.html';
+      toolFrame.style.display = 'block';
+    } else if (tool === 'annotate') {
+      toolFrame.src = '/annotate.html';
+      toolFrame.style.display = 'block';
+    } else if (tool === 'pizza') {
+      toolFrame.src = '/pizza.html';
+      toolFrame.style.display = 'block';
+    } else if (tool === 'qrcode') {
+      toolFrame.src = '/qrcode.html';
+      toolFrame.style.display = 'block';
+    }
+  }
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => showTool(btn.dataset.tool));
+  });
+
+  // YouTube download
+  const ytUrl = document.getElementById('yt-url');
+  const ytGo = document.getElementById('yt-go');
+  const ytStatus = document.getElementById('yt-status');
+
+  async function doDownload() {
+    const url = ytUrl.value.trim();
+    if (!url) return;
+
+    ytGo.disabled = true;
+    ytGo.textContent = 'Downloading...';
+    ytStatus.className = 'yt-status';
+    ytStatus.textContent = 'Starting download...';
+
+    try {
+      const resp = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        ytStatus.className = 'yt-status success';
+        ytStatus.textContent = 'Saved: ' + data.filename;
+        ytUrl.value = '';
+      } else {
+        ytStatus.className = 'yt-status error';
+        ytStatus.textContent = 'Error: ' + (data.error || 'Download failed').slice(0, 200);
+      }
+    } catch (e) {
+      ytStatus.className = 'yt-status error';
+      ytStatus.textContent = 'Connection error';
+    }
+
+    ytGo.disabled = false;
+    ytGo.textContent = 'Download';
+  }
+
+  ytGo.addEventListener('click', doDownload);
+  ytUrl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doDownload();
+  });
+
+  // Transcript
+  const txUrl = document.getElementById('tx-url');
+  const txGo = document.getElementById('tx-go');
+  const txCopy = document.getElementById('tx-copy');
+  const txDownload = document.getElementById('tx-download');
+  const txStatus = document.getElementById('tx-status');
+  const txOutput = document.getElementById('tx-output');
+  let txTitle = 'transcript';
+
+  async function fetchTranscript() {
+    const url = txUrl.value.trim();
+    if (!url) return;
+
+    txGo.disabled = true;
+    txGo.textContent = 'Fetching...';
+    txCopy.disabled = true;
+    txDownload.disabled = true;
+    txStatus.className = 'tx-status';
+    txStatus.textContent = 'Pulling transcript...';
+    txOutput.value = '';
+
+    try {
+      const resp = await fetch('/api/transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        txOutput.value = data.markdown;
+        txTitle = data.title || 'transcript';
+        txStatus.className = 'tx-status success';
+        txStatus.textContent = 'Done.';
+        txCopy.disabled = false;
+        txDownload.disabled = false;
+      } else {
+        txStatus.className = 'tx-status error';
+        txStatus.textContent = 'Error: ' + (data.error || 'Failed').slice(0, 300);
+      }
+    } catch (e) {
+      txStatus.className = 'tx-status error';
+      txStatus.textContent = 'Connection error';
+    }
+
+    txGo.disabled = false;
+    txGo.textContent = 'Fetch';
+  }
+
+  txGo.addEventListener('click', fetchTranscript);
+  txUrl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') fetchTranscript();
+  });
+
+  txCopy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(txOutput.value);
+      txStatus.className = 'tx-status success';
+      txStatus.textContent = 'Copied to clipboard.';
+    } catch (e) {
+      txStatus.className = 'tx-status error';
+      txStatus.textContent = 'Copy failed';
+    }
+  });
+
+  txDownload.addEventListener('click', () => {
+    const blob = new Blob([txOutput.value], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    const safe = txTitle.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 80) || 'transcript';
+    a.href = URL.createObjectURL(blob);
+    a.download = safe + '.md';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+</script>
+</body>
+</html>
