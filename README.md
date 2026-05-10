@@ -65,6 +65,21 @@ If you're Claude Code following the prompt above, do these steps in order:
    sleep 1 && open http://localhost:8787
    ```
 6. **Tell the user**: the toolkit is installed, the `/toolkit` slash command is wired up, and the app is open in their browser. From now on they can just type `/toolkit` to launch it.
+7. **Suggest 5 personalized tools to add.** This is the most important step — don't skip it. The toolkit only earns its keep when it has *their* tools in it, not just mine.
+
+   Based on everything you already know about this user (their role, the kind of work they do, friction points they've mentioned, projects they're working on, files in their home directory, recent shell history — anything you can glean), propose **5 single-page HTML utilities** that would meaningfully reduce a papercut in their day.
+
+   Each suggestion should:
+   - Be a single self-contained `.html` file in the toolkit's pattern (no SaaS, no accounts, runs locally)
+   - Solve one narrow specific annoyance
+   - Be small enough to build in one go
+   - Come with a one-line "why this would help *you*" tied to them, not generic
+
+   **Confidence check before you suggest.** If you're guessing because you don't actually know much about this user yet, stop and ask **2–3 short questions first** (e.g. "What kind of work do you spend most of your time on?", "What's a small repetitive thing you do every week that you wish you didn't?", "Do you mostly work in writing, code, design, video, or something else?"). Then propose the 5.
+
+   After they pick the ones they want (one, all, or none — their call), build them and follow the steps in the "Adding your own tools" section to wire them into `index.html`.
+
+   Don't recommend generic productivity apps that already exist as polished products. The point of this toolkit is the *hyperspecific* stuff that no SaaS would bother to make.
 
 ## Manual install
 
