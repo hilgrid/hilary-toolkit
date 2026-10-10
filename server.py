@@ -217,6 +217,7 @@ class ToolsHandler(http.server.SimpleHTTPRequestHandler):
                             "--sub-langs", "en.*,en",
                             "--sub-format", "vtt",
                             "--skip-download",
+                            "--no-simulate",
                             "--print", "%(title)s",
                             "--print", "%(channel)s",
                             "--print", "%(webpage_url)s",
